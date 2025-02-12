@@ -3,7 +3,7 @@ using namespace std;
 
 // 红黑树结点的类
 class RBNode {
-private:
+public:
 	// 结点值(以int类型为例)
 	int value;
 	// 确认结点是否为黑色的布尔值
@@ -14,7 +14,6 @@ private:
 	RBNode* right;
 	// 结点的父结点
 	RBNode* father;
-public:
 	// 构造函数
 	RBNode(int v = 0, bool b = false, RBNode* f = nullptr, RBNode* l = nullptr, RBNode* r = nullptr) {
 		value = v;
@@ -125,7 +124,13 @@ public:
 	}
 	// 添加结点
 	void addNode(int value) {
-
+		// 如果该红黑树没有根节点则直接修改值与颜色即可
+		// 如果根节点为默认的红色结点说明实际上没有插入过数值
+		if (!root->blacked) {
+			// 插入黑色根节点
+			root->blacked = true;
+			root->value = value;
+		}
 	}
 	// 删除结点
 	void deleteNode(int value) {
