@@ -76,9 +76,9 @@ public:
 		// 当前结点的父结点
 		curFather = this->father;
 		// 当前结点的左分支
-		curLeft = this->right;
+		curLeft = this->left;
 		// 左分支结点的右分支
-		leftRight = curLeft->left;
+		leftRight = curLeft->right;
 		// 确定当前结点是父结点的左分支还是右分支
 		isLeft = curFather && curFather->left == this;
 
@@ -114,10 +114,12 @@ public:
 
 // 红黑树的类
 class RBTree {
-private:
+//private:
+//	// 红黑树的根节点
+//	RBNode* root;
+public:
 	// 红黑树的根节点
 	RBNode* root;
-public:
 	// 构造函数
 	RBTree() {
 		root = new RBNode;
@@ -162,8 +164,70 @@ public:
 		return 1;
 	}
 	// 删除结点
-	void deleteNode(int value) {
-
+	int deleteNode(int value) {
+		RBNode* father = nullptr;
+		int pos = 0;
+		if (!root->blacked) {
+			// 红黑树为空直接返回-1
+			return -1;
+		}
+		else {
+			RBNode* p = root;
+			while (p) {
+				if (p->value == value) {
+					// 找到当前目标结点后,将其数值与前驱结点或者后继结点交换(如果有的话)
+					if (p->left) {
+						RBNode* pa = p->left;
+						RBNode* pt = pa->right;
+						pos = 2;
+						// 寻找前驱结点
+						while (pt) {
+							pa = pt;
+							pt = pt->right;
+							pos = 1;
+						}
+						// 将目标结点与前驱结点的值交换并删除前驱结点
+						p->value = pa->value;
+						pa->value = value;
+						balanceDelete(pa, pa->father, pos);
+					}
+					else if (p->right) {
+						RBNode* pa = p->right;
+						RBNode* pt = pa->left;
+						pos = 1;
+						// 寻找后继结点
+						while (pt) {
+							pa = pt;
+							pt = pt->left;
+							pos = 2;
+						}
+						// 当目标结点与后继结点的值交换并删除后继结点
+						p->value = pa->value;
+						pa->value = value;
+						balanceDelete(pa, pa->father, pos);
+					}
+					else {
+						// 目标结点为叶子结点,直接删除
+						balanceDelete(p, p->father, pos);
+					}
+					return 1;
+				}
+				else if (p->value < value) {
+					// 当前结点值小于目标,前往右子树
+					father = p;
+					p = p->right;
+					pos = 1;
+				}
+				else {
+					// 当前结点值小于目标,前往左子树
+					father = p;
+					p = p->left;
+					pos = 2;
+				}
+			}
+			// 没有这个结点,返回-1
+			return -1;
+		}
 	}
 	// 平衡方法插入结点
 	void balanceInsert(RBNode* cur, RBNode* father, int pos) {
@@ -214,7 +278,7 @@ public:
 					g_pos = 1;
 				}
 				// 祖父结点对上面一层来说相当于插入一个新的红结点,采取递归操作
-				balanceInsert(grand, grand->father,g_pos);
+				balanceInsert(grand, grand->father, g_pos);
 			}
 			else {
 				// 祖父结点只有一段有红结点的情况
@@ -264,6 +328,137 @@ public:
 			}
 		}
 	}
+	// 平衡方法删除结点
+	void balanceDelete(RBNode* cur, RBNode* father, int pos) {
+		if (father == nullptr) {
+			// 为根结点,将颜色改为红色即可
+			cur->blacked = false;
+		}
+		else if (!cur->blacked) {
+			// 为红色叶子结点,直接删除即可
+			if (pos == 1) {
+				father->right = nullptr;
+			}
+			else {
+				father->left = nullptr;
+			}
+			delete cur;
+		}
+		else if (cur->blacked) {
+			// 为黑色叶子结点,需要查看兄弟结点的情况
+			// 同时删除当前结点(考虑塌陷情况,将父结点与子结点连接起来)
+			RBNode* brother = new RBNode;
+			if (pos == 1) {
+				brother = father->left;
+				if (cur->right) {
+					// 坍陷情况下当前塌陷结点与父结点的方向一定与坍陷结点与分支结点的方向一致
+					// 坍陷结点是父结点的右子结点,那么它只可能在右子结点上有分支
+					// 将父结点与右子结点连接起来,根据情况处理坍陷空当
+					father->right = cur->right;
+					cur->right->father = father;
+				}
+				else {
+					// 普通叶子结点直接删除不用考虑连接情况
+					father->right = nullptr;
+				}
+				delete cur;
+			}
+			else if (pos == 2) {
+				brother = father->right;
+				if (cur->left) {
+					// 坍陷结点是父结点的左子结点,那么它只可能在左子结点上有分支
+					// 将父结点与左子结点连接起来,根据情况处理坍陷空当
+					father->left = cur->left;
+					cur->left->father = father;
+				}
+				else {
+					// 普通叶子结点直接删除不用考虑连接情况
+					father->left = nullptr;
+				}
+				delete cur;
+			}
+			// 考察兄弟结点的红色结点分支情况
+			bool left_red = brother->left && !brother->left->blacked;
+			bool right_red = brother->right && !brother->right->blacked;
+			if (left_red && pos == 1) {
+				bool father_bool = father->blacked;
+				// L-L分支,将父亲结点右旋,令兄弟结点的左右子结点为黑色,兄弟结点的颜色与父结点原颜色一致
+				root = father->rightRotate(root);
+				brother->left->blacked = true;
+				brother->right->blacked = true;
+				brother->blacked = father_bool;
+			}
+			else if (right_red && pos == 2) {
+				bool father_bool = father->blacked;
+				// R-R分支,将父亲结点左旋,令兄弟结点的左右子结点为黑色,兄弟结点的颜色与父结点原颜色一致
+				root = father->leftRotate(root);
+				brother->left->blacked = true;
+				brother->right->blacked = true;
+				brother->blacked = father_bool;
+			}
+			else if (left_red && pos == 2) {
+				bool father_bool = father->blacked;
+				// R-L分支,对兄弟结点进行右旋形成R-R结构
+				RBNode* cousin = brother->left;
+				root = brother->rightRotate(root);
+				// R-R结构同上对父亲结点进行左旋并改色
+				root = father->leftRotate(root);
+				cousin->left->blacked = true;
+				cousin->right->blacked = true;
+				cousin->blacked = father_bool;
+			}
+			else if (right_red && pos == 1) {
+				bool father_bool = father->blacked;
+				// L-R分支,对兄弟结点进行左旋形成L-L结构
+				RBNode* cousin = brother->right;
+				root = brother->leftRotate(root);
+				// L-L结构同上对父亲结点进行右旋并改色
+				root = father->rightRotate(root);
+				cousin->left->blacked = true;
+				cousin->right->blacked = true;
+				cousin->blacked = father_bool;
+			}
+			else {
+				// 兄弟结点没有红子结点可供分配
+				if (!father->blacked) {
+					// 父结点为红色结点,将父结点改为黑色,兄弟结点改为红色即可
+					father->blacked = true;
+					brother->blacked = false;
+				}
+				else {
+					// 父结点为黑色结点,无法保存层数平衡,只能进行向下塌陷
+					// 将兄弟结点染成红色
+					brother->blacked = false;
+					if (!father->father) {
+						// 父结点为根结点,说明已经完成一层的塌陷
+						return;
+					}
+					else {
+						// 否则建立一个空当结点,将塌陷继续传递
+						RBNode* blank = new RBNode(0, true, father->father);
+						// 将空当结点插入树中
+						int pos_f = 0;
+						if (father->father->value > father->value) {
+							pos_f = 2;
+							blank->left = father;
+							father->father->left = blank;
+							blank->father = father->father;
+							father->father = blank;
+						}
+						else if (father->father->value < father->value) {
+							pos_f = 1;
+							blank->right = father;
+							father->father->right = blank;
+							blank->father = father->father;
+							father->father = blank;
+						}
+						// 通过递归进行删除操作
+						balanceDelete(blank, blank->father, pos_f);
+					}
+				}
+			}
+		}
+	}
 	// 展示红黑树
 	void show() {
 		if (!root->blacked) {
@@ -294,9 +489,39 @@ public:
 
 int main() {
 	int value = 0;
+	int op = 0;
+	int res = 0;
 	RBTree rbt;
-	while (cin >> value) {
-		rbt.addNode(value);
-		rbt.show();
+	RBTree new_rbt;
+	while (true) {
+		cout << "1.红黑树中插入结点" << endl;
+		cout << "2.红黑树中删除结点" << endl;
+		cout << "3.清空红黑树" << endl;
+		cout << "4.退出" << endl;
+		cin >> op;
+		switch (op)
+		{
+		case 1:
+			cout << "请输出要插入的值" << endl;
+			cin >> value;
+			res = rbt.addNode(value);
+			if (res == 1) rbt.show();
+			else if (res == -1) cout << "插入失败!" << endl;
+			break;
+		case 2:
+			cout << "请输出要删除的值" << endl;
+			cin >> value;
+			res = rbt.deleteNode(value);
+			if (res == 1) rbt.show();
+			else if (res == -1) cout << "删除失败!" << endl;
+			break;
+		case 3:
+			rbt = new_rbt;
+			break;
+		case 4:
+			return 1;
+		default:
+			break;
+		}
 	}
 }
